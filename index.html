@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>салам</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <style>
+        /* Используем системные цвета Telegram, чтобы апп выглядел как родной */
+        body {
+            font-family: sans-serif;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            text-align: center;
+            padding: 40px 20px;
+        }
+        button {
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1 id="greeting">Привет!</h1>
+    <p>Счетчик чак-чака: <span id="counter">0</span></p>
+    <button id="clickBtn">Добавить порцию</button>
+
+    <script>
+        // Инициализируем Web App
+        const tg = window.Telegram.WebApp;
+        
+        // Разворачиваем приложение на весь экран
+        tg.expand(); 
+        
+        // Сообщаем Телеграму, что приложение готово к отображению
+        tg.ready();
+
+        // Достаем имя пользователя прямо из его профиля Telegram
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+            document.getElementById('greeting').innerText = `Привет, ${user.first_name}!`;
+        }
+
+        let count = 0;
+        const counterElement = document.getElementById('counter');
+        const btn = document.getElementById('clickBtn');
+
+        // Логика кнопки
+        btn.addEventListener('click', () => {
+            count++;
+            counterElement.innerText = count;
+
+            // Как только нажали первый раз — показываем нативную Главную Кнопку Telegram внизу экрана
+            if (count === 1) {
+                tg.MainButton.setText('Отправить данные боту');
+                tg.MainButton.show();
+            }
+        });
+
+        // Что происходит при нажатии на ту самую нижнюю кнопку Telegram
+        tg.MainButton.onClick(() => {
+            // Отправляем данные обратно в чат с ботом
+            tg.sendData(`Я накликал ${count} порций!`);
+            
+            // Закрываем мини-приложение
+            tg.close(); 
+        });
+    </script>
+</body>
+</html>
