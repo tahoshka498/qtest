@@ -2,78 +2,501 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>салам</title>
-    
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>комбинатор</title>
     <style>
-        /* Используем системные цвета Telegram, чтобы апп выглядел как родной */
-        body {
-            font-family: sans-serif;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+        :root {
+            --bg-main: #e1d1d1;
+            --bg-board: #f4ece1;
+            --cell-bg: #e6dac8;
+            --primary: #4a90e2;
+            --accent: #f39c12;
+            --text-dark: #3e3325;
+            --white: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body, html {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .no-select { user-select: none; -webkit-user-select: none; }
+
+        #app {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen {
+            display: flex;
+            flex-direction: column;
+            flex: 1; 
+            width: 100%;
+            padding: 15px;
+        }
+
+        .hidden { display: none !important; }
+
+        /* --- ЛОГИН --- */
+        #login-screen {
+            justify-content: center;
+            align-items: center;
+        }
+        .login-box {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 30px;
             text-align: center;
-            padding: 40px 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 350px;
         }
-        button {
-            background-color: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            border-radius: 10px;
-            cursor: pointer;
-            margin-top: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        h1 { font-size: 28px; margin-bottom: 20px; color: #5a8a65; font-weight: 900;}
+        
+        input {
+            width: 100%; padding: 15px; font-size: 18px; border: 3px solid #e1e1e1;
+            border-radius: 15px; text-align: center; margin-bottom: 15px; font-weight: bold;
+            -webkit-appearance: none;
+            user-select: auto;
         }
+        
+        .btn {
+            width: 100%; padding: 15px; font-size: 20px; font-weight: 900;
+            background: #8a865a; color: white; border: none; border-radius: 15px;
+            cursor: pointer; box-shadow: 0 6px 0 #635a3e; transition: transform 0.1s;
+        }
+        .btn:active { transform: translateY(6px); box-shadow: none; }
+        #error-msg { color: #e74c3c; font-size: 14px; margin-bottom: 10px; height: 16px; font-weight: bold; }
+
+        /* --- ИГРА --- */
+        .top-bar { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .stat-box {
+            background: var(--white); border-radius: 15px; padding: 10px;
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .stat-value { font-size: 18px; font-weight: 900; display: flex; align-items: center; gap: 5px; }
+        .stat-label { font-size: 11px; color: #888; margin-top: 2px; text-align: center; font-weight: bold;}
+        .energy-color { color: var(--primary); }
+        .score-color { color: var(--accent); }
+
+        /* Игровое поле 7x9 */
+        .board-container {
+            background: var(--bg-board); 
+            border-radius: 20px; 
+            padding: 8px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.05); 
+            margin-bottom: 10px;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            flex: 1;
+            min-height: 0;
+        }
+        
+        #board {
+            display: grid; 
+            /* Жесткая фиксация колонок и строк, чтобы Safari их не растягивал */
+            grid-template-columns: repeat(7, minmax(0, 1fr)); 
+            grid-template-rows: repeat(9, minmax(0, 1fr));
+            gap: 4px;
+            width: 100%; 
+            height: 100%;
+        }
+        
+        .cell {
+            background: var(--cell-bg); 
+            border-radius: 8px; 
+            display: flex; justify-content: center; align-items: center;
+            font-size: 24px;
+            position: relative; cursor: pointer;
+            /* Невидимая рамка резервирует место, чтобы интерфейс не дергался */
+            border: 2px solid transparent; 
+            box-shadow: inset 0 -2px 4px rgba(0,0,0,0.03);
+            transition: all 0.1s;
+        }
+        
+        .cell.selected {
+            background: #fff; 
+            border-color: var(--primary); /* Просто красим готовую невидимую рамку */
+            box-shadow: 0 0 10px rgba(74, 144, 226, 0.5); 
+            transform: scale(1.05); 
+            z-index: 2;
+        }
+        
+        .item { 
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            line-height: 1; /* Фиксируем высоту эмодзи */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .flag-item {
+            width: 24px; height: 24px; border-radius: 4px;
+            background: linear-gradient(to bottom, #009933 33.3%, #ffffff 33.3%, #ffffff 66.6%, #cc0000 66.6%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Кнопка генератора */
+        .generator-area { display: flex; justify-content: center; padding-bottom: 10px; }
+        .gen-btn {
+            background: #e6dac8; border: 4px solid var(--white);
+            width: 70px; height: 70px; border-radius: 20px;
+            font-size: 40px; color: var(--primary); font-weight: 900;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1); cursor: pointer; transition: 0.1s;
+            position: relative;
+        }
+        .gen-btn:active { transform: translateY(5px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .gen-cost {
+            position: absolute; bottom: -8px; background: var(--primary);
+            color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+            font-weight: bold; border: 2px solid white;
+        }
+
+        /* Модалка нового предмета */
+        #new-item-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .rays {
+            position: absolute; width: 200vw; height: 200vw;
+            background: repeating-conic-gradient(from 0deg, transparent 0deg 15deg, rgba(255,255,255,0.1) 15deg 30deg);
+            animation: spin 10s linear infinite; z-index: 101;
+        }
+        .modal-content {
+            z-index: 102; text-align: center; color: white;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .modal-emoji { font-size: 80px; margin: 20px 0; text-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .modal-title { font-size: 26px; color: #ffd700; margin-bottom: 10px; text-transform: uppercase; font-weight: 900;}
+        .modal-desc { font-size: 14px; margin-bottom: 30px; opacity: 0.9; padding: 0 20px; font-weight: bold;}
+
+        @keyframes popIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
-    <h1 id="greeting">Привет!</h1>
-    <p>Счетчик чак-чака: <span id="counter">0</span></p>
-    <button id="clickBtn">Добавить порцию</button>
+<body class="no-select">
 
-    <script>
-        // Инициализируем Web App
-        const tg = window.Telegram.WebApp;
-        
-        // Разворачиваем приложение на весь экран
-        tg.expand(); 
-        
-        // Сообщаем Телеграму, что приложение готово к отображению
-        tg.ready();
+<div id="app">
+    <div id="login-screen" class="screen">
+        <div class="login-box">
+            <h1>комбинатор</h1>
+            <div id="error-msg"></div>
+            <input type="text" id="username" placeholder="Введи имя (от 3 букв)..." maxlength="12">
+            <button class="btn" onclick="login()">ИГРАТЬ</button>
+        </div>
+    </div>
 
-        // Достаем имя пользователя прямо из его профиля Telegram
-        const user = tg.initDataUnsafe?.user;
-        if (user) {
-            document.getElementById('greeting').innerText = `Привет, ${user.first_name}!`;
+    <div id="game-screen" class="screen hidden">
+        <div class="top-bar">
+            <div class="stat-box">
+                <div class="stat-value energy-color">⚡ <span id="energy-val">100</span>/<span id="max-energy-val">100</span></div>
+                <div class="stat-label" id="regen-label">+2 в мин (60с)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value score-color">⭐ <span id="score-val">0</span></div>
+                <div class="stat-label" id="player-name-lbl">ИГРОК</div>
+            </div>
+        </div>
+
+        <div class="board-container">
+            <div id="board"></div>
+        </div>
+
+        <div class="generator-area">
+            <div class="gen-btn" onclick="generateItem()">
+                +
+                <div class="gen-cost">-5 ⚡</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="new-item-modal" class="hidden no-select">
+    <div class="rays"></div>
+    <div class="modal-content">
+        <div class="modal-title">Новый предмет!</div>
+        <div class="modal-emoji" id="modal-emoji">🚗</div>
+        <h2 id="modal-name">Машина</h2>
+        <div class="modal-desc" id="modal-bonus"></div>
+        <button class="btn" style="width: 200px; background: #ffd700; color: #333;" onclick="closeModal()">ОК</button>
+    </div>
+</div>
+
+<script>
+    const COLS = 7;
+    const ROWS = 9;
+    const TOTAL_CELLS = COLS * ROWS; 
+
+    const itemsDB = [
+        null,
+        { tier: 1, icon: "📎", name: "Скрепка" },
+        { tier: 2, icon: "✏️", name: "Карандаш" },
+        { tier: 3, icon: "✂️", name: "Ножницы" },
+        { tier: 4, icon: "☕", name: "Кофе" },
+        { tier: 5, icon: "📱", name: "Телефон" },
+        { tier: 6, icon: "💻", name: "Ноутбук" },
+        { tier: 7, icon: "📺", name: "Телевизор" },
+        { tier: 8, icon: "🚲", name: "Велосипед" },
+        { tier: 9, icon: "🛵", name: "Скутер" },
+        { tier: 10, icon: "🚗", name: "Машина", bonus: "+10 Макс Энергии, +2 к восстанавлению" },
+        { tier: 11, isFlag: true, name: "Флаг Татарстана", bonus: "+25 Макс Энергии!" }
+    ];
+
+    let player = "";
+    let grid = new Array(TOTAL_CELLS).fill(0);
+    let energy = 100;
+    let maxEnergy = 100;
+    let regenRate = 2;
+    let score = 0;
+    let unlockedTiers = [1];
+    let selectedCell = null;
+    let regenSecondsLeft = 60;
+
+    const takenNames = ['admin', 'god', 'player'];
+
+    function getSave() {
+        try { return JSON.parse(localStorage.getItem('merge_save_v4')); } 
+        catch(e) { return null; }
+    }
+    
+    function setSave(data) {
+        try { localStorage.setItem('merge_save_v4', JSON.stringify(data)); } 
+        catch(e) {}
+    }
+
+    window.onload = () => {
+        const savedData = getSave();
+        if (savedData) {
+            player = savedData.player || "Игрок";
+            grid = (savedData.grid && savedData.grid.length === TOTAL_CELLS) ? savedData.grid : new Array(TOTAL_CELLS).fill(0);
+            energy = savedData.energy || 100;
+            maxEnergy = savedData.maxEnergy || 100;
+            regenRate = savedData.regenRate || 2;
+            score = savedData.score || 0;
+            unlockedTiers = savedData.unlockedTiers || [1];
+            showGame();
+        }
+    };
+
+    function login() {
+        const input = document.getElementById('username').value.trim().toLowerCase();
+        const err = document.getElementById('error-msg');
+        
+        if (input.length < 3) { err.innerText = "Имя слишком короткое!"; return; }
+        if (takenNames.includes(input)) { err.innerText = "Это имя занято!"; return; }
+        
+        player = input;
+        saveGame();
+        showGame();
+    }
+
+    function showGame() {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+        document.getElementById('player-name-lbl').innerText = player.toUpperCase();
+        
+        createBoard();
+        updateUI();
+        startRegenTimer();
+    }
+
+    function createBoard() {
+        const board = document.getElementById('board');
+        board.innerHTML = "";
+        for (let i = 0; i < TOTAL_CELLS; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `cell-${i}`;
+            cell.onclick = () => handleCellClick(i);
+            board.appendChild(cell);
+        }
+        renderBoard();
+    }
+
+    function renderBoard() {
+        for (let i = 0; i < TOTAL_CELLS; i++) {
+            const cell = document.getElementById(`cell-${i}`);
+            const tier = grid[i];
+            
+            cell.innerHTML = "";
+            cell.classList.remove('selected');
+            
+            if (i === selectedCell) cell.classList.add('selected');
+
+            if (tier > 0) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item';
+                if (itemsDB[tier].isFlag) {
+                    itemDiv.className = 'item flag-item';
+                } else {
+                    itemDiv.innerText = itemsDB[tier].icon;
+                }
+                cell.appendChild(itemDiv);
+            }
+        }
+    }
+
+    function handleCellClick(index) {
+        if (selectedCell === null) {
+            if (grid[index] !== 0) {
+                selectedCell = index;
+                renderBoard();
+            }
+            return;
         }
 
-        let count = 0;
-        const counterElement = document.getElementById('counter');
-        const btn = document.getElementById('clickBtn');
+        if (selectedCell === index) {
+            selectedCell = null;
+            renderBoard();
+            return;
+        }
 
-        // Логика кнопки
-        btn.addEventListener('click', () => {
-            count++;
-            counterElement.innerText = count;
+        const tier1 = grid[selectedCell];
+        const tier2 = grid[index];
 
-            // Как только нажали первый раз — показываем нативную Главную Кнопку Telegram внизу экрана
-            if (count === 1) {
-                tg.MainButton.setText('Отправить данные боту');
-                tg.MainButton.show();
-            }
-        });
+        if (tier2 === 0) {
+            grid[index] = tier1;
+            grid[selectedCell] = 0;
+            selectedCell = null;
+            renderBoard();
+            saveGame();
+            return;
+        }
 
-        // Что происходит при нажатии на ту самую нижнюю кнопку Telegram
-        tg.MainButton.onClick(() => {
-            // Отправляем данные обратно в чат с ботом
-            tg.sendData(`Я накликал ${count} порций!`);
+        if (tier1 === tier2 && tier1 < itemsDB.length - 1) {
+            const newTier = tier1 + 1;
+            grid[index] = newTier;
+            grid[selectedCell] = 0;
+            selectedCell = null;
+
+            energy = Math.min(energy + 2, maxEnergy);
+            score += Math.pow(2, tier1 - 1);
+
+            checkBonuses(newTier);
             
-            // Закрываем мини-приложение
-            tg.close(); 
-        });
-    </script>
+            if (!unlockedTiers.includes(newTier)) {
+                unlockedTiers.push(newTier);
+                showNewItem(newTier);
+            }
+
+            renderBoard();
+            updateUI();
+            saveGame();
+            return;
+        }
+
+        if (tier1 !== tier2) {
+            selectedCell = index;
+            renderBoard();
+        }
+    }
+
+    function generateItem() {
+        if (energy < 5) {
+            alert("Не хватает энергии! Подожди или соедини предметы.");
+            return;
+        }
+
+        let emptyCells = [];
+        for (let i = 0; i < TOTAL_CELLS; i++) {
+            if (grid[i] === 0) emptyCells.push(i);
+        }
+
+        if (emptyCells.length === 0) {
+            alert("Поле заполнено! Освободи место.");
+            return;
+        }
+
+        const randomIdx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        grid[randomIdx] = 1;
+        
+        energy -= 5;
+        updateUI();
+        renderBoard();
+        saveGame();
+    }
+
+    function checkBonuses(tier) {
+        if (tier === 10) { maxEnergy += 10; regenRate += 2; }
+        if (tier === 11) { maxEnergy += 25; }
+    }
+
+    let timerInterval;
+    function startRegenTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            regenSecondsLeft--;
+            if (regenSecondsLeft <= 0) {
+                regenSecondsLeft = 60;
+                if (energy < maxEnergy) {
+                    energy = Math.min(energy + regenRate, maxEnergy);
+                    saveGame();
+                }
+            }
+            updateUI();
+        }, 1000);
+    }
+
+    function updateUI() {
+        document.getElementById('energy-val').innerText = energy;
+        document.getElementById('max-energy-val').innerText = maxEnergy;
+        document.getElementById('score-val').innerText = score;
+        
+        if (energy >= maxEnergy) {
+            document.getElementById('regen-label').innerText = `МАКСИМУМ`;
+        } else {
+            document.getElementById('regen-label').innerText = `+${regenRate} в мин (${regenSecondsLeft}с)`;
+        }
+    }
+
+    function showNewItem(tier) {
+        const modal = document.getElementById('new-item-modal');
+        const item = itemsDB[tier];
+        
+        if (item.isFlag) {
+            document.getElementById('modal-emoji').innerHTML = "<div class='flag-item' style='width: 70px; height: 70px; margin: 0 auto;'></div>";
+        } else {
+            document.getElementById('modal-emoji').innerText = item.icon;
+        }
+        
+        document.getElementById('modal-name').innerText = item.name;
+        document.getElementById('modal-bonus').innerText = item.bonus ? item.bonus : "Новый предмет добавлен в коллекцию!";
+        
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('new-item-modal').classList.add('hidden');
+    }
+
+    function saveGame() {
+        setSave({ player, grid, energy, maxEnergy, regenRate, score, unlockedTiers });
+    }
+</script>
+
 </body>
 </html>
